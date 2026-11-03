@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Puzzle Peluches</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: plein écran, barre fine en haut, table de jeu nocturne dessous */
+:root{
+  --night:#0b1120; --table:#121a2e; --frame:#1c2640; --line:#2c3a5c;
+  --text:#e9ecf5; --muted:#8e98b4; --gold:#f0bb4f; --ok:#6fd3a0;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--night);color:var(--text);font-family:var(--display);overflow:hidden;display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--table)}
+h1{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+h1 span{color:var(--gold)}
+.count{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.count b{color:var(--text);font-weight:500}
+.bar{width:120px;height:4px;background:var(--frame);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .3s}
+.players{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.chip{font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted);display:flex;align-items:center;gap:6px}
+.chip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c,var(--muted))}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+.sep{width:1px;align-self:stretch;background:var(--line)}
+button{font:500 13px var(--display);color:var(--text);background:var(--frame);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--gold)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--gold);color:var(--night);border-color:var(--gold)}
+button.primary{background:var(--gold);color:var(--night);border-color:var(--gold)}
+button:disabled{opacity:.45;cursor:default;border-color:var(--line)}
+main{position:relative;flex:1;min-height:0}
+canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+canvas.dragging{cursor:grabbing}
+.status{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));font-size:12px;color:var(--muted);background:color-mix(in srgb,var(--table) 85%,transparent);padding:5px 10px;border-radius:6px;pointer-events:none}
+.modal{position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--night) 70%,transparent);padding:16px}
+.card{background:var(--table);border:1px solid var(--line);border-radius:10px;padding:20px;width:min(360px,100%);display:grid;gap:14px}
+.card h2{margin:0;font-size:17px}
+.card p{margin:0;line-height:1.45;color:var(--muted);font-size:13px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{font-family:var(--mono);font-size:12px;padding:5px 9px}
+.field{display:flex;align-items:center;gap:10px}
+.field input{width:110px;font:500 18px var(--mono);color:var(--text);background:var(--night);border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+.field span{font-size:13px;color:var(--muted)}
+.note{font-family:var(--mono);font-size:12px;color:var(--gold)}
+.row{display:flex;gap:8px;justify-content:flex-end}
+.win{position:absolute;left:50%;top:18px;transform:translateX(-50%);background:var(--gold);color:var(--night);font-weight:700;font-size:16px;padding:10px 18px;border-radius:8px;box-shadow:0 8px 30px #0008}
+@media (max-width:620px){.bar,.sep{display:none}.players{margin-left:0}}
+</style>
+<style>[hidden]{display:none!important}body{margin:0}</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+/* ============================================================
+   COLLE ICI LA CONFIGURATION DE TON PROJET FIREBASE
+   (Firebase > Paramètres du projet > Tes applications > Config)
+   ============================================================ */
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBAKqkw1trDld3j2iX5IM0xFPnhEqY5z-w",
+  authDomain: "puzzle-1f214.firebaseapp.com",
+  databaseURL: "https://puzzle-1f214-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "puzzle-1f214",
+  storageBucket: "puzzle-1f214.firebasestorage.app",
+  messagingSenderId: "1011349484370",
+  appId: "1:1011349484370:web:61b7f00db67e894dc2008b",
+  measurementId: "G-K10W8DNCL3"
+};
+</script>
+</head>
+<body>
+<header>
+  <h1>Puzzle <span>Peluches</span></h1>
+  <div class="count"><b id="placed">0</b> / <span id="total">0</span></div>
+  <div class="bar"><i id="prog"></i></div>
+  <div class="count" id="saved"></div>
+  <div class="tools">
+    <button id="help1" title="Pose automatiquement une pièce au hasard à sa place">+1 pièce</button>
+    <button id="help10" title="Pose automatiquement 10 pièces au hasard">+10 pièces</button>
+    <span class="sep"></span>
+    <button id="ghost" aria-pressed="false" title="Afficher l'image en transparence sur le cadre">Modèle</button>
+    <button id="fit">Recentrer</button>
+    <button id="reset">Nouvelle partie</button>
+  </div>
+  <div class="players" id="players"></div>
+</header>
+<main>
+  <canvas id="cv"></canvas>
+  <div class="status" id="status" hidden></div>
+  <form class="modal" id="confirm" hidden>
+    <div class="card">
+      <h2>Nouvelle partie</h2>
+      <div class="presets" id="presets"></div>
+      <div class="field"><input id="nbInput" type="number" min="20" max="1000" step="1" value="350" inputmode="numeric" aria-label="Nombre de pièces"><span>pièces (20 à 1000)</span></div>
+      <div class="note" id="nbNote"></div>
+      <p>Les pièces sont mélangées et la progression actuelle est effacée, pour vous deux.</p>
+      <div class="row"><button type="button" id="cNo">Annuler</button><button type="submit" class="primary" id="cYes">Lancer</button></div>
+    </div>
+  </form>
+  <form class="modal" id="nameForm" hidden>
+    <div class="card">
+      <h2>Ton prénom</h2>
+      <p>Il s'affiche à côté de ton curseur chez l'autre joueur.</p>
+      <div class="field"><input id="nameInput" type="text" maxlength="20" autocomplete="given-name" style="width:100%;font-size:16px" aria-label="Ton prénom"></div>
+      <div class="row"><button type="submit" class="primary">Jouer</button></div>
+    </div>
+  </form>
+  <div class="win" id="win" hidden>Puzzle terminé !</div>
+</main>
+
+<script>
+
+(() => {
+const IMG_SRC = "data:image/jpeg;base64,__IMG__";
+const IW = 1280, IH = 724, SS = 1.5;
+const $ = id => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gridFor(n) {
+  n = Math.max(20, Math.min(1000, Math.round(n) || 350));
+  const cols = Math.max(2, Math.round(Math.sqrt(n * IW / IH)));
+  const rows = Math.max(2, Math.round(n / cols));
+  return { cols, rows };
+}
+
+// ---- grille courante ----
+let COLS, ROWS, N, PW, PH, K, PAD, SNAP, WORLD, hEdge, vEdge, pieces = [], order = [];
+
+const TAB = [
+  [[.34,0],[.34,0],[.34,0]],
+  [[.40,0],[.42,.10],[.38,.18]],
+  [[.32,.30],[.40,.40],[.50,.40]],
+  [[.60,.40],[.68,.30],[.62,.18]],
+  [[.58,.10],[.60,0],[.66,0]],
+  [[1,0],[1,0],[1,0]],
+];
+function edgeSegs(A, B, horiz, e) {
+  if (!e) return { start: A, segs: [[A, B, B]] };
+  const map = ([u, v]) => {
+    u = u === 0 || u === 1 ? u : u + e.j;
+    const off = v * K * e.s * e.k;
+    return horiz ? [A[0] + u * (B[0] - A[0]), A[1] + off] : [A[0] + off, A[1] + u * (B[1] - A[1])];
+  };
+  return { start: A, segs: TAB.map(s => s.map(map)) };
+}
+function rev(ed) {
+  const pts = [ed.start, ...ed.segs.map(s => s[2])], segs = [];
+  for (let i = ed.segs.length - 1; i >= 0; i--) segs.push([ed.segs[i][1], ed.segs[i][0], pts[i]]);
+  return { start: pts[pts.length - 1], segs };
+}
+function piecePath(r, c, ox, oy) {
+  const x0 = c * PW, y0 = r * PH, x1 = x0 + PW, y1 = y0 + PH;
+  const edges = [
+    edgeSegs([x0, y0], [x1, y0], true, hEdge[r][c]),
+    edgeSegs([x1, y0], [x1, y1], false, vEdge[r][c + 1]),
+    rev(edgeSegs([x0, y1], [x1, y1], true, hEdge[r + 1][c])),
+    rev(edgeSegs([x0, y0], [x0, y1], false, vEdge[r][c])),
+  ];
+  const p = new Path2D();
+  p.moveTo(x0 - ox, y0 - oy);
+  for (const ed of edges) for (const [a, b, e] of ed.segs) p.bezierCurveTo(a[0] - ox, a[1] - oy, b[0] - ox, b[1] - oy, e[0] - ox, e[1] - oy);
+  p.closePath();
+  return p;
+}
+function countSlots(mx, my) {
+  let n = 0; const sx = PW + 10, sy = PH + 8;
+  for (let y = -my + 14; y < IH + my - PH - 10; y += sy)
+    for (let x = -mx + 14; x < IW + mx - PW - 10; x += sx)
+      if (x + PW < -18 || x > IW + 18 || y + PH < -18 || y > IH + 18) n++;
+  return n;
+}
+function setGrid(cols, rows) {
+  COLS = cols; ROWS = rows; N = cols * rows;
+  PW = IW / COLS; PH = IH / ROWS; K = Math.min(PW, PH);
+  PAD = Math.ceil(K * .45) + 6; SNAP = Math.max(8, K * .32);
+  let mx = Math.max(120, 2.5 * PW), my = Math.max(90, 2.5 * PH);
+  while (countSlots(mx, my) < N) { mx += PW * .6; my += PH * .45; }
+  WORLD = { x: -mx, y: -my, w: IW + 2 * mx, h: IH + 2 * my };
+  const er = rng(20261103 + cols * 1009 + rows);
+  const mk = () => ({ s: er() < .5 ? 1 : -1, j: (er() - .5) * .08, k: .9 + er() * .2 });
+  hEdge = []; vEdge = [];
+  for (let r = 0; r <= ROWS; r++) { hEdge[r] = []; for (let c = 0; c < COLS; c++) hEdge[r][c] = (r === 0 || r === ROWS) ? null : mk(); }
+  for (let r = 0; r < ROWS; r++) { vEdge[r] = []; for (let c = 0; c <= COLS; c++) vEdge[r][c] = (c === 0 || c === COLS) ? null : mk(); }
+  pieces = [];
+  for (let i = 0; i < N; i++) {
+    const r = Math.floor(i / COLS), c = i % COLS;
+    pieces.push({ i, r, c, tx: c * PW, ty: r * PH, x: 0, y: 0, placed: false, local: piecePath(r, c, c * PW, r * PH), sprite: null });
+  }
+  order = pieces.map(p => p.i);
+  drag = null; remoteDrag.clear();
+  $("total").textContent = N;
+  if (img.complete && img.naturalWidth) for (const p of pieces) makeSprite(p);
+}
+
+let round = 1, remoteDocs = new Map(), showGhost = false;
+function scatter(seed) {
+  const R = rng(seed * 7919 + 13), slots = [];
+  const sx = PW + 10, sy = PH + 8;
+  for (let y = WORLD.y + 14; y < WORLD.y + WORLD.h - PH - 10; y += sy)
+    for (let x = WORLD.x + 14; x < WORLD.x + WORLD.w - PW - 10; x += sx)
+      if (x + PW < -18 || x > IW + 18 || y + PH < -18 || y > IH + 18) slots.push([x, y]);
+  for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
+  return pieces.map((p, k) => { const s = slots[k % slots.length]; return [s[0] + (R() - .5) * 8, s[1] + (R() - .5) * 8]; });
+}
+function applyAll() {
+  const sc = scatter(round);
+  for (const p of pieces) {
+    if (p === drag?.p) continue;
+    const d = remoteDocs.get(p.i);
+    if (d && d.round === round) { p.x = d.x; p.y = d.y; p.placed = !!d.placed; }
+    else { p.x = sc[p.i][0]; p.y = sc[p.i][1]; p.placed = false; }
+    if (p.placed) { p.x = p.tx; p.y = p.ty; }
+  }
+  rebuildBoard(); updateCount(); dirty = true;
+}
+
+// ---- image, sprites, cadre ----
+const img = new Image();
+let board = null, bctx = null;
+function makeSprite(p) {
+  const w = Math.ceil((PW + 2 * PAD) * SS), h = Math.ceil((PH + 2 * PAD) * SS);
+  const s = document.createElement("canvas"); s.width = w; s.height = h;
+  const g = s.getContext("2d");
+  g.scale(SS, SS); g.translate(PAD, PAD);
+  g.save(); g.shadowColor = "rgba(0,0,0,.55)"; g.shadowBlur = Math.min(6, K * .12); g.shadowOffsetY = 2;
+  g.fillStyle = "#000"; g.fill(p.local); g.restore();
+  g.save(); g.clip(p.local); g.drawImage(img, -p.tx, -p.ty); g.restore();
+  g.lineWidth = 1; g.strokeStyle = "rgba(255,255,255,.22)"; g.stroke(p.local);
+  p.sprite = s;
+}
+function rebuildBoard() {
+  if (!bctx) return;
+  bctx.clearRect(0, 0, board.width, board.height);
+  for (const p of pieces) if (p.placed) paintPlaced(p);
+}
+function paintPlaced(p) {
+  if (!bctx) return;
+  bctx.save(); bctx.scale(2, 2); bctx.translate(p.tx, p.ty);
+  bctx.save(); bctx.clip(p.local); bctx.drawImage(img, -p.tx, -p.ty); bctx.restore();
+  bctx.lineWidth = .6; bctx.strokeStyle = "rgba(0,0,0,.35)"; bctx.stroke(p.local);
+  bctx.restore();
+}
+
+// ---- vue ----
+let view = { s: 1, x: 0, y: 0 }, dpr = 1, dirty = true;
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const r = cv.getBoundingClientRect();
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  dirty = true;
+}
+function fit() {
+  const r = cv.getBoundingClientRect();
+  const s = Math.min(r.width / WORLD.w, r.height / WORLD.h) * .98;
+  view = { s, x: r.width / 2 - (WORLD.x + WORLD.w / 2) * s, y: r.height / 2 - (WORLD.y + WORLD.h / 2) * s };
+  dirty = true;
+}
+const toWorld = (sx, sy) => [(sx - view.x) / view.s, (sy - view.y) / view.s];
+
+// ---- joueurs distants ----
+const COLORS = ["#f0bb4f", "#6fd3a0", "#7fb2ff", "#ff8fa3", "#c79bff", "#5fd7e0"];
+let room = null, peers = [], names = {}, userCap = null;
+const colorFor = peer => { let h = 0; for (const ch of peer) h = h * 31 + ch.charCodeAt(0) | 0; return COLORS[Math.abs(h) % COLORS.length]; };
+const remoteDrag = new Map();
+
+function draw() {
+  dirty = false;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const w = cv.width / dpr, h = cv.height / dpr;
+  ctx.fillStyle = "#0b1120"; ctx.fillRect(0, 0, w, h);
+  ctx.setTransform(dpr * view.s, 0, 0, dpr * view.s, dpr * view.x, dpr * view.y);
+  ctx.fillStyle = "#121a2e"; ctx.fillRect(WORLD.x, WORLD.y, WORLD.w, WORLD.h);
+  ctx.fillStyle = "#1c2640"; ctx.fillRect(-6, -6, IW + 12, IH + 12);
+  ctx.fillStyle = "#0e1526"; ctx.fillRect(0, 0, IW, IH);
+  if (showGhost && img.complete) { ctx.globalAlpha = .22; ctx.drawImage(img, 0, 0); ctx.globalAlpha = 1; }
+  if (board) ctx.drawImage(board, 0, 0, IW, IH);
+  for (const i of order) {
+    const p = pieces[i];
+    if (!p || p.placed || !p.sprite) continue;
+    ctx.drawImage(p.sprite, p.x - PAD, p.y - PAD, PW + 2 * PAD, PH + 2 * PAD);
+    const who = remoteDrag.get(i);
+    if (who) { ctx.save(); ctx.translate(p.x, p.y); ctx.lineWidth = 2 / view.s; ctx.strokeStyle = colorFor(who); ctx.stroke(p.local); ctx.restore(); }
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const pr of peers) {
+    if (pr.sameTab || !Array.isArray(pr.presence?.cursor)) continue;
+    const [wx, wy] = pr.presence.cursor;
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) continue;
+    const sx = wx * view.s + view.x, sy = wy * view.s + view.y, col = colorFor(pr.peer);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + 4, sy + 15); ctx.lineTo(sx + 8, sy + 9); ctx.lineTo(sx + 15, sy + 8); ctx.closePath(); ctx.fill();
+    const label = nameOf(pr);
+    ctx.font = "600 12px 'Bricolage Grotesque', system-ui, sans-serif";
+    const tw = ctx.measureText(label).width;
+    ctx.fillRect(sx + 12, sy + 14, tw + 12, 19);
+    ctx.fillStyle = "#0b1120"; ctx.fillText(label, sx + 18, sy + 28);
+  }
+}
+function loop() { if (dirty) draw(); requestAnimationFrame(loop); }
+
+// ---- interactions ----
+let drag = null, pan = null;
+function hit(wx, wy) {
+  for (let k = order.length - 1; k >= 0; k--) {
+    const p = pieces[order[k]];
+    if (p.placed || remoteDrag.has(p.i)) continue;
+    const lx = wx - p.x, ly = wy - p.y;
+    if (lx < -PAD || ly < -PAD || lx > PW + PAD || ly > PH + PAD) continue;
+    if (ctx.isPointInPath(p.local, lx, ly)) return p;
+  }
+  return null;
+}
+function toTop(i) { const k = order.indexOf(i); if (k >= 0) { order.splice(k, 1); order.push(i); } }
+const pointers = new Map(); let pinch = null;
+const clampS = s => { const r = cv.getBoundingClientRect(); const min = Math.min(r.width / WORLD.w, r.height / WORLD.h) * .5; return Math.max(min, Math.min(8, s)); };
+
+cv.addEventListener("pointerdown", e => {
+  cv.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
+  if (pointers.size === 2) {
+    if (drag) dropPiece(); pan = null;
+    const [a, b] = [...pointers.values()];
+    pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), s: view.s, cx: (a[0] + b[0]) / 2, cy: (a[1] + b[1]) / 2, vx: view.x, vy: view.y };
+    return;
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const [wx, wy] = toWorld(e.offsetX, e.offsetY);
+  const p = hit(wx, wy);
+  if (p) { drag = { p, dx: wx - p.x, dy: wy - p.y }; toTop(p.i); cv.classList.add("dragging"); sendPresence(wx, wy); }
+  else pan = { sx: e.offsetX, sy: e.offsetY, vx: view.x, vy: view.y };
+  dirty = true;
+});
+cv.addEventListener("pointermove", e => {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
+  if (pinch && pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const s = clampS(pinch.s * d / pinch.d);
+    view.s = s; view.x = pinch.cx - (pinch.cx - pinch.vx) * s / pinch.s; view.y = pinch.cy - (pinch.cy - pinch.vy) * s / pinch.s;
+    dirty = true; return;
+  }
+  const [wx, wy] = toWorld(e.offsetX, e.offsetY);
+  if (drag) { drag.p.x = wx - drag.dx; drag.p.y = wy - drag.dy; dirty = true; }
+  else if (pan) { view.x = pan.vx + e.offsetX - pan.sx; view.y = pan.vy + e.offsetY - pan.sy; dirty = true; }
+  sendPresence(wx, wy);
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (drag) dropPiece();
+  pan = null; cv.classList.remove("dragging");
+}
+cv.addEventListener("pointerup", endPointer);
+cv.addEventListener("pointercancel", endPointer);
+cv.addEventListener("pointerleave", () => { if (room && !drag) room.presence({ cursor: null }).catch(() => {}); });
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const s = clampS(view.s * Math.exp(-e.deltaY * .0015));
+  view.x = e.offsetX - (e.offsetX - view.x) * s / view.s; view.y = e.offsetY - (e.offsetY - view.y) * s / view.s; view.s = s; dirty = true;
+}, { passive: false });
+
+function dropPiece() {
+  const p = drag.p; drag = null;
+  if (Math.abs(p.x - p.tx) < SNAP && Math.abs(p.y - p.ty) < SNAP) placePiece(p);
+  dirty = true;
+  if (room) room.presence({ drag: null }).catch(() => {});
+  save(p);
+}
+function placePiece(p) { p.x = p.tx; p.y = p.ty; p.placed = true; paintPlaced(p); updateCount(); }
+
+// ---- aide : poser des pièces automatiquement ----
+function autoPlace(n) {
+  const free = pieces.filter(p => !p.placed && p !== drag?.p && !remoteDrag.has(p.i));
+  for (let k = 0; k < n && free.length; k++) {
+    const p = free.splice(Math.floor(Math.random() * free.length), 1)[0];
+    placePiece(p); save(p);
+  }
+  dirty = true;
+}
+$("help1").onclick = () => autoPlace(1);
+$("help10").onclick = () => autoPlace(10);
+
+// ---- sauvegarde partagée ----
+// ---- sauvegarde partagée (Firebase) ----
+let db = null, myRef = null;
+const myId = Math.random().toString(36).slice(2, 10);
+let myName = "";
+try { myName = localStorage.getItem("puzzle-name") || ""; } catch {}
+const writing = new Map();
+async function save(p) {
+  if (!db) return;
+  const body = { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, placed: p.placed, round };
+  remoteDocs.set(p.i, body);
+  if (writing.has(p.i)) { writing.set(p.i, body); return; }
+  writing.set(p.i, body);
+  while (writing.get(p.i)) {
+    const b = writing.get(p.i); writing.set(p.i, null);
+    try { await db.ref("pieces/p" + p.i).set(b); } catch (e) { setStatus("Impossible d'enregistrer. Vérifie les règles de la base Firebase."); }
+  }
+  writing.delete(p.i);
+}
+
+let lastSend = 0;
+function sendPresence(wx, wy) {
+  if (!myRef) return;
+  const now = performance.now(); if (now - lastSend < 50) return; lastSend = now;
+  myRef.update({
+    cursor: [Math.round(wx), Math.round(wy)],
+    drag: drag ? { i: drag.p.i, x: Math.round(drag.p.x * 10) / 10, y: Math.round(drag.p.y * 10) / 10, round } : null,
+  }).catch(() => {});
+}
+
+function nameOf(pr) { return String(pr.name || "Joueur").slice(0, 20); }
+function resolveNames() {}
+function renderPlayers() {
+  const box = $("players"); box.textContent = "";
+  for (const pr of peers) {
+    const el = document.createElement("span"); el.className = "chip";
+    el.style.setProperty("--c", colorFor(pr.peer));
+    el.textContent = pr.isMe ? "Toi" : nameOf(pr);
+    box.appendChild(el);
+  }
+}
+function onPeerChange(all) {
+  peers = Object.entries(all || {}).map(([id, v]) => ({
+    peer: id, isMe: id === myId, sameTab: id === myId, name: v && v.name,
+    presence: { cursor: v && v.cursor, drag: v && v.drag },
+  }));
+  peers.sort((a, b) => (b.isMe - a.isMe) || a.peer.localeCompare(b.peer));
+  remoteDrag.clear();
+  for (const pr of peers) {
+    if (pr.sameTab) continue;
+    const d = pr.presence.drag;
+    if (d && d.round === round && Number.isInteger(d.i) && d.i >= 0 && d.i < N) {
+      const p = pieces[d.i];
+      if (drag?.p === p) continue;
+      if (!p.placed && Number.isFinite(d.x) && Number.isFinite(d.y)) {
+        if (!remoteDrag.has(d.i)) toTop(d.i);
+        p.x = d.x; p.y = d.y; remoteDrag.set(d.i, pr.peer);
+      }
+    }
+  }
+  renderPlayers(); dirty = true;
+}
+
+function updateCount() {
+  const n = pieces.filter(p => p.placed).length;
+  $("placed").textContent = n; $("prog").style.width = (n / N * 100) + "%";
+  $("win").hidden = n !== N;
+  $("help1").disabled = $("help10").disabled = n === N;
+}
+function setStatus(t) { const s = $("status"); s.textContent = t; s.hidden = !t; }
+
+// ---- nouvelle partie ----
+const PRESETS = [50, 100, 200, 350, 500, 750, 1000];
+for (const n of PRESETS) {
+  const b = document.createElement("button"); b.type = "button"; b.textContent = n;
+  b.onclick = () => { $("nbInput").value = n; updateNote(); };
+  $("presets").appendChild(b);
+}
+function updateNote() {
+  const g = gridFor(+$("nbInput").value);
+  $("nbNote").textContent = `${g.cols} × ${g.rows} = ${g.cols * g.rows} pièces`;
+}
+$("nbInput").addEventListener("input", updateNote);
+$("fit").onclick = fit;
+$("ghost").onclick = () => { showGhost = !showGhost; $("ghost").setAttribute("aria-pressed", showGhost); dirty = true; };
+$("reset").onclick = () => { $("nbInput").value = N; updateNote(); $("confirm").hidden = false; $("nbInput").focus(); };
+$("cNo").onclick = () => { $("confirm").hidden = true; };
+$("confirm").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("confirm").hidden = true;
+  const g = gridFor(+$("nbInput").value);
+  round += 1;
+  if (g.cols !== COLS || g.rows !== ROWS) { setGrid(g.cols, g.rows); fit(); }
+  applyAll();
+  if (db) {
+    try { await db.ref("game").set({ round, cols: COLS, rows: ROWS }); await db.ref("pieces").remove(); }
+    catch { setStatus("Impossible de lancer la partie pour tout le monde."); }
+  }
+});
+
+// ---- prénom ----
+$("nameForm").addEventListener("submit", e => {
+  e.preventDefault();
+  myName = $("nameInput").value.trim().slice(0, 20) || "Joueur";
+  try { localStorage.setItem("puzzle-name", myName); } catch {}
+  $("nameForm").hidden = true;
+  if (myRef) myRef.update({ name: myName }).catch(() => {});
+});
+
+// ---- démarrage ----
+window.addEventListener("resize", () => { resize(); });
+img.onload = () => {
+  board = document.createElement("canvas"); board.width = IW * 2; board.height = IH * 2; bctx = board.getContext("2d");
+  setGrid(25, 14);
+  resize(); fit(); applyAll(); loop();
+  if (!myName) { $("nameForm").hidden = false; $("nameInput").focus(); }
+  connect();
+};
+img.onerror = () => setStatus("La photo « photo.jpg » est introuvable à côté de index.html.");
+img.src = "photo.jpg";
+
+function connect() {
+  const cfg = window.FIREBASE_CONFIG || {};
+  if (!window.firebase || !cfg.databaseURL || String(cfg.apiKey || "").includes("COLLE")) {
+    $("saved").textContent = "Mode solo (Firebase pas configuré)"; return;
+  }
+  $("saved").textContent = "Connexion…";
+  const timer = setTimeout(() => { $("saved").textContent = "Connexion lente…"; }, 10000);
+  try { firebase.initializeApp(cfg); db = firebase.database(); }
+  catch (e) { clearTimeout(timer); $("saved").textContent = "Mode solo (configuration invalide)"; db = null; return; }
+
+  db.ref("game").on("value", s => {
+    const v = s.val() || {};
+    const nr = Number.isInteger(v.round) ? v.round : 1;
+    const cols = Number.isInteger(v.cols) && v.cols >= 2 && v.cols <= 60 ? v.cols : 25;
+    const rows = Number.isInteger(v.rows) && v.rows >= 2 && v.rows <= 40 ? v.rows : 14;
+    const gridChanged = cols !== COLS || rows !== ROWS;
+    if (gridChanged) { setGrid(cols, rows); fit(); }
+    if (gridChanged || nr !== round) { round = nr; applyAll(); }
+  }, () => setStatus("Lecture impossible : vérifie les règles de la base Firebase."));
+
+  const onPiece = s => {
+    const i = +String(s.key).slice(1), v = s.val();
+    if (!(i >= 0 && i < 2400) || !v) return;
+    if (!Number.isFinite(v.x) || !Number.isFinite(v.y) || writing.has(i)) return;
+    remoteDocs.set(i, { x: v.x, y: v.y, placed: !!v.placed, round: v.round });
+    const p = pieces[i];
+    if (!p || drag?.p === p || v.round !== round) return;
+    const wasPlaced = p.placed;
+    p.x = v.x; p.y = v.y; p.placed = !!v.placed;
+    if (p.placed) { p.x = p.tx; p.y = p.ty; if (!wasPlaced) paintPlaced(p); }
+    else if (wasPlaced) rebuildBoard();
+    toTop(i); updateCount(); dirty = true;
+  };
+  const pr = db.ref("pieces");
+  pr.on("child_added", onPiece);
+  pr.on("child_changed", onPiece);
+  pr.on("child_removed", s => { remoteDocs.delete(+String(s.key).slice(1)); });
+  pr.once("value", () => { clearTimeout(timer); $("saved").textContent = "Sauvegarde auto ✓"; });
+
+  myRef = db.ref("presence/" + myId);
+  db.ref(".info/connected").on("value", s => {
+    if (s.val() !== true) { $("saved").textContent = "Hors ligne…"; return; }
+    $("saved").textContent = "Sauvegarde auto ✓";
+    myRef.onDisconnect().remove();
+    myRef.set({ name: myName || "Joueur", cursor: null, drag: null });
+  });
+  db.ref("presence").on("value", s => onPeerChange(s.val()));
+  window.addEventListener("pagehide", () => { myRef.remove(); });
+}
+cv.addEventListener("pointerleave", () => { if (myRef && !drag) myRef.update({ cursor: null }).catch(() => {}); });
+cv.addEventListener("pointerup", () => { if (myRef) myRef.update({ drag: null }).catch(() => {}); });
+})();
+</script>
+</body>
+</html>
