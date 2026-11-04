@@ -117,7 +117,8 @@ window.FIREBASE_CONFIG = {
 
 (() => {
 const IMG_SRC = "data:image/jpeg;base64,__IMG__";
-const IW = 1280, IH = 724, SS = 1.5;
+let IW = 1280, IH = 724, src = null, DEF = { cols: 25, rows: 14 };
+const SS = 1.5;
 const $ = id => document.getElementById(id);
 const cv = $("cv"), ctx = cv.getContext("2d");
 
@@ -195,7 +196,7 @@ function setGrid(cols, rows) {
   order = pieces.map(p => p.i);
   drag = null; remoteDrag.clear();
   $("total").textContent = N;
-  if (img.complete && img.naturalWidth) for (const p of pieces) makeSprite(p);
+  if (src) for (const p of pieces) makeSprite(p);
 }
 
 let round = 1, remoteDocs = new Map(), showGhost = false;
@@ -230,7 +231,7 @@ function makeSprite(p) {
   g.scale(SS, SS); g.translate(PAD, PAD);
   g.save(); g.shadowColor = "rgba(0,0,0,.55)"; g.shadowBlur = Math.min(6, K * .12); g.shadowOffsetY = 2;
   g.fillStyle = "#000"; g.fill(p.local); g.restore();
-  g.save(); g.clip(p.local); g.drawImage(img, -p.tx, -p.ty); g.restore();
+  g.save(); g.clip(p.local); g.drawImage(src, -p.tx, -p.ty); g.restore();
   g.lineWidth = 1; g.strokeStyle = "rgba(255,255,255,.22)"; g.stroke(p.local);
   p.sprite = s;
 }
@@ -242,7 +243,7 @@ function rebuildBoard() {
 function paintPlaced(p) {
   if (!bctx) return;
   bctx.save(); bctx.scale(2, 2); bctx.translate(p.tx, p.ty);
-  bctx.save(); bctx.clip(p.local); bctx.drawImage(img, -p.tx, -p.ty); bctx.restore();
+  bctx.save(); bctx.clip(p.local); bctx.drawImage(src, -p.tx, -p.ty); bctx.restore();
   bctx.lineWidth = .6; bctx.strokeStyle = "rgba(0,0,0,.35)"; bctx.stroke(p.local);
   bctx.restore();
 }
@@ -278,7 +279,7 @@ function draw() {
   ctx.fillStyle = "#121a2e"; ctx.fillRect(WORLD.x, WORLD.y, WORLD.w, WORLD.h);
   ctx.fillStyle = "#1c2640"; ctx.fillRect(-6, -6, IW + 12, IH + 12);
   ctx.fillStyle = "#0e1526"; ctx.fillRect(0, 0, IW, IH);
-  if (showGhost && img.complete) { ctx.globalAlpha = .22; ctx.drawImage(img, 0, 0); ctx.globalAlpha = 1; }
+  if (showGhost && src) { ctx.globalAlpha = .22; ctx.drawImage(src, 0, 0); ctx.globalAlpha = 1; }
   if (board) ctx.drawImage(board, 0, 0, IW, IH);
   for (const i of order) {
     const p = pieces[i];
@@ -497,14 +498,20 @@ $("nameForm").addEventListener("submit", e => {
 // ---- démarrage ----
 window.addEventListener("resize", () => { resize(); });
 img.onload = () => {
+  // adapte le puzzle à la taille et au format de la photo
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (w >= h) { IW = 1280; IH = Math.round(1280 * h / w); } else { IH = 1000; IW = Math.round(1000 * w / h); }
+  src = document.createElement("canvas"); src.width = IW; src.height = IH;
+  src.getContext("2d").drawImage(img, 0, 0, IW, IH);
   board = document.createElement("canvas"); board.width = IW * 2; board.height = IH * 2; bctx = board.getContext("2d");
-  setGrid(25, 14);
+  DEF = gridFor(350);
+  setGrid(DEF.cols, DEF.rows);
   resize(); fit(); applyAll(); loop();
   if (!myName) { $("nameForm").hidden = false; $("nameInput").focus(); }
   connect();
 };
 img.onerror = () => setStatus("La photo « photo.jpg » est introuvable à côté de index.html.");
-img.src = "photo.jpg";
+img.src = "photo.jpg?v=" + Date.now(); // évite l'ancienne photo gardée en cache
 
 function connect() {
   const cfg = window.FIREBASE_CONFIG || {};
@@ -519,8 +526,8 @@ function connect() {
   db.ref("game").on("value", s => {
     const v = s.val() || {};
     const nr = Number.isInteger(v.round) ? v.round : 1;
-    const cols = Number.isInteger(v.cols) && v.cols >= 2 && v.cols <= 60 ? v.cols : 25;
-    const rows = Number.isInteger(v.rows) && v.rows >= 2 && v.rows <= 40 ? v.rows : 14;
+    const cols = Number.isInteger(v.cols) && v.cols >= 2 && v.cols <= 80 ? v.cols : DEF.cols;
+    const rows = Number.isInteger(v.rows) && v.rows >= 2 && v.rows <= 80 ? v.rows : DEF.rows;
     const gridChanged = cols !== COLS || rows !== ROWS;
     if (gridChanged) { setGrid(cols, rows); fit(); }
     if (gridChanged || nr !== round) { round = nr; applyAll(); }
